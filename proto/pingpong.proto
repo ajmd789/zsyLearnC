@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package pingpong;
+
+message PingRequest {
+  string from = 1;
+  string to = 2;
+  string body = 3;
+  string sent_at = 4;
+  int32 sequence = 5;
+}
+
+message PingReply {
+  bool received = 1;
+  string ack_from = 2;
+  string ack_at = 3;
+  string note = 4;
+  int32 sequence = 5;
+}
+
+service Messenger {
+  rpc SendMessage(PingRequest) returns (PingReply);
+}
