@@ -208,3 +208,56 @@ git rm -r --cached build build-podman
 ```powershell
 & $PODMAN machine stop
 ```
+## 12. 重构后目录规划（线程拆分 + 公共层）
+
+为解决 `src/main.cpp` 逻辑过重，当前代码已按“入口层 / 编排层 / 线程层 / 公共层”拆分。
+
+目录结构：
+
+```text
+zsyLearnC/
+├─ include/
+│  ├─ app/
+│  │  └─ pingpong_app.h
+│  ├─ common/
+│  │  ├─ grpc_message_client.h
+│  │  ├─ messenger_service.h
+│  │  ├─ server_utils.h
+│  │  ├─ thread_safe_logger.h
+│  │  ├─ time_utils.h
+│  │  └─ turn_coordinator.h
+│  ├─ node1/
+│  │  └─ node1_sender.h
+│  └─ node2/
+│     └─ node2_sender.h
+├─ src/
+│  ├─ app/
+│  │  └─ pingpong_app.cpp
+│  ├─ common/
+│  │  ├─ grpc_message_client.cpp
+│  │  ├─ messenger_service.cpp
+│  │  ├─ server_utils.cpp
+│  │  ├─ thread_safe_logger.cpp
+│  │  ├─ time_utils.cpp
+│  │  └─ turn_coordinator.cpp
+│  ├─ node1/
+│  │  └─ node1_sender.cpp
+│  ├─ node2/
+│  │  └─ node2_sender.cpp
+│  └─ main.cpp
+├─ proto/
+│  └─ pingpong.proto
+└─ CMakeLists.txt
+```
+
+职责划分：
+- `src/main.cpp`：只做程序入口（创建并运行 `PingPongApp`）。
+- `src/app`：编排流程（启动 server、创建 client、拉起线程、收尾退出）。
+- `src/node1`：`node1` 线程自身发送循环逻辑。
+- `src/node2`：`node2` 线程自身发送循环逻辑。
+- `src/common`：公共基础能力（时间、日志、gRPC 服务与客户端封装、轮次协调、server 构建）。
+
+后续扩展建议：
+- 新增线程角色时，按 `src/nodeX` + `include/nodeX` 新建目录，不改 `common` 的业务语义。
+- `common` 仅放可复用能力，不放节点特有规则。
+- `app` 层只做组合编排，不写底层 gRPC 细节。

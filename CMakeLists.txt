@@ -69,6 +69,29 @@ target_link_libraries(pingpong_proto
         Threads::Threads
 )
 
+add_library(pingpong_core
+    src/app/pingpong_app.cpp
+    src/common/grpc_message_client.cpp
+    src/common/messenger_service.cpp
+    src/common/server_utils.cpp
+    src/common/thread_safe_logger.cpp
+    src/common/time_utils.cpp
+    src/common/turn_coordinator.cpp
+    src/node1/node1_sender.cpp
+    src/node2/node2_sender.cpp
+)
+
+target_include_directories(pingpong_core
+    PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
+        "${GENERATED_DIR}"
+)
+
+target_link_libraries(pingpong_core
+    PUBLIC
+        pingpong_proto
+        Threads::Threads
+)
+
 add_executable(pingpong_demo src/main.cpp)
-target_include_directories(pingpong_demo PRIVATE "${GENERATED_DIR}")
-target_link_libraries(pingpong_demo PRIVATE pingpong_proto)
+target_link_libraries(pingpong_demo PRIVATE pingpong_core)
