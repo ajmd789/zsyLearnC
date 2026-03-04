@@ -112,51 +112,57 @@ exit
 & $PODMAN rm zsy-dev
 ```
 
-## 6. 一条命令：容器内编译并运行
+## 6. 一条命令：容器内编译并运行（推荐）
+
+使用绝对路径，不依赖当前目录：
 
 ```powershell
-& $PODMAN run --rm -i --cpus=4 --memory=8g -v "${PWD}:/workspace" -w /workspace zsy-learn-grpc:debian13 bash -lc "rm -rf build-podman && mkdir -p build-podman && cd build-podman && cmake .. -DCMAKE_BUILD_TYPE=Release && cmake --build . -j && ./pingpong_demo"
+& $PODMAN run --rm -i --cpus=4 --memory=8g -v "${PWD}:/workspace" -w /workspace zsy-learn-grpc:debian13 bash -lc 'set -e; rm -rf /workspace/build-podman; cmake -S /workspace -B /workspace/build-podman -DCMAKE_BUILD_TYPE=Release; cmake --build /workspace/build-podman -j"$(nproc)"; /workspace/build-podman/pingpong_demo'
 ```
 
 ## 7. 容器内一步一步：编译、打包、运行
 
 先进入容器（推荐用 5.1 或 5.2 的方式进入），然后在容器内执行下面命令。
 
-1) 进入工程目录：
+1) 修复当前目录并回到工程根目录（关键）：
 
 ```bash
-cd /workspace
+cd / || exit 1
+cd /workspace || exit 1
+pwd
 ```
 
-2) 生成独立构建目录：
+2) 清理旧构建目录（使用绝对路径）：
 
 ```bash
-rm -rf build-podman
-mkdir -p build-podman
-cd build-podman
+rm -rf /workspace/build-podman
 ```
 
-3) 配置与编译：
+3) 配置工程：
 
 ```bash
-cmake .. -DCMAKE_BUILD_TYPE=Release
-cmake --build . -j"$(nproc)"
+cmake -S /workspace -B /workspace/build-podman -DCMAKE_BUILD_TYPE=Release
 ```
 
-4) 运行程序：
+4) 编译：
 
 ```bash
-./pingpong_demo
+cmake --build /workspace/build-podman -j"$(nproc)"
 ```
 
-5) 打包可执行文件（生成 `.tar.gz`）：
+5) 运行程序：
 
 ```bash
-cd /workspace
-mkdir -p dist
-cp build-podman/pingpong_demo dist/
-tar -czf dist/pingpong_demo-linux-amd64.tar.gz -C dist pingpong_demo
-sha256sum dist/pingpong_demo-linux-amd64.tar.gz
+/workspace/build-podman/pingpong_demo
+```
+
+6) 打包可执行文件（生成 `.tar.gz`）：
+
+```bash
+mkdir -p /workspace/dist
+cp /workspace/build-podman/pingpong_demo /workspace/dist/
+tar -czf /workspace/dist/pingpong_demo-linux-amd64.tar.gz -C /workspace/dist pingpong_demo
+sha256sum /workspace/dist/pingpong_demo-linux-amd64.tar.gz
 ```
 
 打包后产物路径：
@@ -188,6 +194,19 @@ git rm -r --cached build build-podman
 
 ## 10. 常见问题
 
+### `Current working directory cannot be established`
+原因：当前 shell 所在目录失效（常见于你在 `build-podman` 目录里时，目录被删除，或挂载目录状态变化）。
+
+处理：
+
+```bash
+cd /
+cd /workspace
+pwd
+cmake -S /workspace -B /workspace/build-podman -DCMAKE_BUILD_TYPE=Release
+cmake --build /workspace/build-podman -j"$(nproc)"
+```
+
 ### `image not known`
 原因：本地没有 `debian:13`。
 
@@ -196,7 +215,7 @@ git rm -r --cached build build-podman
 ### `CMakeCache.txt directory is different`
 原因：本机构建缓存与容器路径冲突。
 
-处理：使用 `build-podman`（第 6、7 步命令已处理）。
+处理：使用 `build-podman`，并采用第 6、7 步的绝对路径命令。
 
 ### `grpc_cpp_plugin program not found`
 项目已修复为：
@@ -208,6 +227,7 @@ git rm -r --cached build build-podman
 ```powershell
 & $PODMAN machine stop
 ```
+
 ## 12. 重构后目录规划（线程拆分 + 公共层）
 
 为解决 `src/main.cpp` 逻辑过重，当前代码已按“入口层 / 编排层 / 线程层 / 公共层”拆分。
