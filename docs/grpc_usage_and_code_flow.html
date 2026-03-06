@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>zsyLearnC gRPC 使用与关键代码流转</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #111a2b;
+      --text: #e7edf7;
+      --muted: #9fb0c6;
+      --line: #22324f;
+      --hl: #143a4f;
+      --accent: #4fc3f7;
+      --ok: #81c784;
+      --warn: #ffb74d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: radial-gradient(circle at 0 0, #12203a, var(--bg) 48%);
+      color: var(--text);
+      line-height: 1.65;
+    }
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    h1, h2, h3 { line-height: 1.3; }
+    h1 { margin: 0 0 8px; font-size: 30px; }
+    .desc { color: var(--muted); margin-top: 0; }
+    .grid {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: color-mix(in srgb, var(--panel) 90%, #fff 10%);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+    }
+    .sticky { position: sticky; top: 16px; height: fit-content; }
+    .toc a {
+      display: block;
+      color: #b8c7de;
+      text-decoration: none;
+      padding: 4px 0;
+    }
+    .toc a:hover { color: #fff; }
+    .pill {
+      display: inline-block;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 10px;
+      color: #cce4ff;
+      font-size: 12px;
+      margin-right: 8px;
+    }
+    pre {
+      margin: 0;
+      overflow-x: auto;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #0b1423;
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    code { font-family: "JetBrains Mono", Consolas, monospace; }
+    .hl {
+      display: block;
+      background: color-mix(in srgb, var(--hl) 90%, #fff 10%);
+      border-left: 3px solid var(--accent);
+      padding-left: 8px;
+      margin-left: -8px;
+    }
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    .flow {
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px dashed var(--line);
+      background: #0a1626;
+      font-family: "JetBrains Mono", Consolas, monospace;
+      white-space: pre-wrap;
+    }
+    .tip {
+      border-left: 3px solid var(--accent);
+      padding: 10px 12px;
+      background: #0c1b30;
+      border-radius: 8px;
+      color: #d1e4ff;
+    }
+    .q li { margin: 6px 0; }
+    @media (max-width: 980px) {
+      .grid { grid-template-columns: 1fr; }
+      .sticky { position: static; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>zsyLearnC gRPC 使用与关键代码流转</h1>
+    <p class="desc">
+      这份文档只讲你仓库里的真实代码路径：从 <code>proto</code>、到 CMake 生成代码、到 Server/Client 调用、到线程轮次协调。
+    </p>
+    <span class="pill">项目: zsyLearnC</span>
+    <span class="pill">语言: C++17</span>
+    <span class="pill">通信: gRPC unary</span>
+
+    <div class="grid" style="margin-top: 16px;">
+      <aside class="card sticky toc">
+        <h3 style="margin-top: 0;">目录</h3>
+        <a href="#goal">1. 程序目标</a>
+        <a href="#proto">2. proto 契约</a>
+        <a href="#cmake">3. 编译期代码生成</a>
+        <a href="#app">4. 运行期总编排</a>
+        <a href="#server">5. 服务端处理链</a>
+        <a href="#client">6. 客户端发送链</a>
+        <a href="#turn">7. 线程轮次协作</a>
+        <a href="#flow">8. 第 1 轮完整时序</a>
+        <a href="#points">9. 核心知识点</a>
+        <a href="#ask">10. 下一步追问模板</a>
+      </aside>
+
+      <main>
+        <section id="goal" class="card">
+          <h2>1. 程序目标</h2>
+          <p>同一进程里启动两个 gRPC server，再用两个 sender 线程轮流互发消息，共 10 轮。</p>
+          <div class="flow">node1 sender -> gRPC -> node2 service -> ACK
+node2 sender -> gRPC -> node1 service -> ACK
+（每次发送后 sleep 5 秒，轮次由 TurnCoordinator 控制）</div>
+        </section>
+
+        <section id="proto" class="card" style="margin-top: 16px;">
+          <h2>2. proto 契约（<code>proto/pingpong.proto</code>）</h2>
+          <pre><code>syntax = "proto3";
+package pingpong;
+
+message PingRequest {
+  string from = 1;
+  string to = 2;
+  string body = 3;
+  string sent_at = 4;
+  <span class="hl">int32 sequence = 5;</span>
+}
+
+message PingReply {
+  <span class="hl">bool received = 1;</span>
+  string ack_from = 2;
+  string ack_at = 3;
+  string note = 4;
+  int32 sequence = 5;
+}
+
+service Messenger {
+  <span class="hl">rpc SendMessage(PingRequest) returns (PingReply);</span>
+}</code></pre>
+          <p class="tip">关键点：客户端和服务端都以这份契约生成类型和接口，业务代码只围绕这些类型开发。</p>
+        </section>
+
+        <section id="cmake" class="card" style="margin-top: 16px;">
+          <h2>3. 编译期代码生成（<code>CMakeLists.txt</code>）</h2>
+          <pre><code>find_program(GRPC_CPP_PLUGIN_EXECUTABLE grpc_cpp_plugin REQUIRED)
+
+add_custom_command(
+  OUTPUT "${PROTO_SRCS}" "${PROTO_HDRS}" "${GRPC_SRCS}" "${GRPC_HDRS}"
+  COMMAND "${PROTOC_EXECUTABLE}"
+  ARGS
+    --proto_path "${CMAKE_CURRENT_SOURCE_DIR}/proto"
+    --cpp_out "${GENERATED_DIR}"
+    --grpc_out "${GENERATED_DIR}"
+    <span class="hl">--plugin=protoc-gen-grpc=${GRPC_CPP_PLUGIN_EXECUTABLE}</span>
+    "${PROTO_FILE}"
+)
+
+add_library(pingpong_proto "${PROTO_SRCS}" "${GRPC_SRCS}")</code></pre>
+          <p>这段配置把 <code>pingpong.pb.*</code> 和 <code>pingpong.grpc.pb.*</code> 生成为可编译库，供业务层链接。</p>
+        </section>
+
+        <section id="app" class="card" style="margin-top: 16px;">
+          <h2>4. 运行期总编排（<code>src/app/pingpong_app.cpp</code>）</h2>
+          <pre><code>constexpr char kNode1ServerAddr[] = "0.0.0.0:50051";
+constexpr char kNode2ServerAddr[] = "0.0.0.0:50052";
+constexpr char kNode1Target[] = "127.0.0.1:50051";
+constexpr char kNode2Target[] = "127.0.0.1:50052";
+
+common::MessengerService node1_service("node1", logger);
+common::MessengerService node2_service("node2", logger);
+
+auto node1_server = common::BuildServer(kNode1ServerAddr, &node1_service);
+auto node2_server = common::BuildServer(kNode2ServerAddr, &node2_service);
+
+<span class="hl">common::GrpcMessageClient node1_client(kNode2Target, logger);</span>
+<span class="hl">common::GrpcMessageClient node2_client(kNode1Target, logger);</span>
+
+common::TurnCoordinator coordinator(common::Turn::Node1ToNode2);</code></pre>
+          <p>app 层职责是“连线和调度”，不做底层 RPC 细节。</p>
+        </section>
+
+        <section id="server" class="card" style="margin-top: 16px;">
+          <h2>5. 服务端处理链</h2>
+          <h3>5.1 Server 注册（<code>src/common/server_utils.cpp</code>）</h3>
+          <pre><code>grpc::ServerBuilder builder;
+builder.AddListeningPort(listen_addr, grpc::InsecureServerCredentials());
+builder.RegisterService(service);
+return builder.BuildAndStart();</code></pre>
+
+          <h3 style="margin-top: 14px;">5.2 RPC 处理（<code>src/common/messenger_service.cpp</code>）</h3>
+          <pre><code>grpc::Status MessengerService::SendMessage(...){
+  logger_.Log("... received sequence=...");
+  <span class="hl">reply->set_received(true);</span>
+  <span class="hl">reply->set_ack_from(self_name_);</span>
+  reply->set_ack_at(now);
+  reply->set_note("received");
+  reply->set_sequence(request->sequence());
+  return grpc::Status::OK;
+}</code></pre>
+          <p><span class="ok">OK 路径：</span>收到消息 -> 写日志 -> 回 ACK 字段。</p>
+        </section>
+
+        <section id="client" class="card" style="margin-top: 16px;">
+          <h2>6. 客户端发送链（<code>src/common/grpc_message_client.cpp</code>）</h2>
+          <pre><code>stub_(pingpong::Messenger::NewStub(
+  grpc::CreateChannel(target, grpc::InsecureChannelCredentials())));
+
+bool GrpcMessageClient::Send(const std::string&amp; from, const std::string&amp; to, int sequence) {
+  pingpong::PingRequest request;
+  request.set_from(from);
+  request.set_to(to);
+  request.set_body("hello from " + from);
+  request.set_sent_at(CurrentTimeString());
+  request.set_sequence(sequence);
+
+  grpc::ClientContext context;
+  pingpong::PingReply reply;
+  <span class="hl">const grpc::Status status = stub_-&gt;SendMessage(&amp;context, request, &amp;reply);</span>
+
+  if (!status.ok()) {
+    <span class="hl">logger_.Log("... failed: " + status.error_message());</span>
+    return false;
+  }
+  logger_.Log("... ack=true ...");
+  return true;
+}</code></pre>
+          <p><span class="warn">注意：</span>这是同步 unary 调用。没有 deadline、没有重试，适合 demo。</p>
+        </section>
+
+        <section id="turn" class="card" style="margin-top: 16px;">
+          <h2>7. 线程轮次协作（<code>TurnCoordinator + Node1/Node2Sender</code>）</h2>
+          <h3>7.1 轮次协调器</h3>
+          <pre><code>Turn TurnCoordinator::WaitFor(Turn expected_turn) {
+  cv_.wait(lock, [&amp;]() { return turn_ == expected_turn || turn_ == Turn::Done; });
+  return turn_;
+}
+
+void TurnCoordinator::SetTurn(Turn next_turn) {
+  turn_ = next_turn;
+  cv_.notify_all();
+}</code></pre>
+
+          <h3 style="margin-top: 14px;">7.2 Sender 逻辑（关键行）</h3>
+          <pre><code>// node1_sender.cpp
+if (coordinator_.WaitFor(common::Turn::Node1ToNode2) == common::Turn::Done) return;
+<span class="hl">client_.Send("node1", "node2", round);</span>
+coordinator_.SetTurn(common::Turn::Node2ToNode1);
+
+// node2_sender.cpp
+if (coordinator_.WaitFor(common::Turn::Node2ToNode1) == common::Turn::Done) return;
+<span class="hl">client_.Send("node2", "node1", round);</span>
+if (round == rounds_) coordinator_.SetTurn(common::Turn::Done);
+else coordinator_.SetTurn(common::Turn::Node1ToNode2);</code></pre>
+        </section>
+
+        <section id="flow" class="card" style="margin-top: 16px;">
+          <h2>8. 第 1 轮完整时序</h2>
+          <div class="flow">[Node1Sender]
+  WaitFor(Node1ToNode2)
+  -> GrpcMessageClient::Send("node1","node2",1)
+     -> stub->SendMessage(...)
+        -> [node2 MessengerService::SendMessage]
+           set_received(true), set_ack_from("node2"), return OK
+     <- receive PingReply
+  log: node1 -> node2 sequence=1 ack=true ...
+  sleep(5s)
+  SetTurn(Node2ToNode1)
+
+[Node2Sender] 开始下一半轮次</div>
+        </section>
+
+        <section id="points" class="card" style="margin-top: 16px;">
+          <h2>9. 你必须吃透的 9 个点</h2>
+          <ol>
+            <li><code>.proto</code> 是通信契约，客户端和服务端都依赖它。</li>
+            <li><code>grpc_cpp_plugin</code> 缺失会直接导致构建失败。</li>
+            <li><code>Service</code> 是服务端入口，<code>Stub</code> 是客户端入口。</li>
+            <li>这个项目使用同步 unary RPC，不是流式 RPC。</li>
+            <li><code>grpc::Status</code> 判定传输层成功失败；业务成功需看 reply 字段。</li>
+            <li>日志必须线程安全，否则多线程输出会串行污染。</li>
+            <li>轮次顺序由 <code>TurnCoordinator</code> 保证，不是 gRPC 自动保证。</li>
+            <li>当前是明文信道（<code>InsecureChannelCredentials</code>），生产需 TLS。</li>
+            <li>若要高吞吐，下一步是 async + CompletionQueue。</li>
+          </ol>
+        </section>
+
+        <section id="ask" class="card" style="margin-top: 16px; margin-bottom: 20px;">
+          <h2>10. 下一步可以直接问我</h2>
+          <ol class="q">
+            <li>“把本项目改成异步 gRPC（CompletionQueue），逐文件给我改造方案。”</li>
+            <li>“给 Send 增加 deadline、重试、指数退避，附可运行代码。”</li>
+            <li>“改成 TLS：服务端证书、客户端验证、CMake/运行参数怎么配？”</li>
+            <li>“把第 N 轮调用链按源码逐行讲解。”</li>
+            <li>“给我一套 gRPC 面试级问题，用本项目来回答。”</li>
+          </ol>
+        </section>
+      </main>
+    </div>
+  </div>
+</body>
+</html>
+

@@ -1,0 +1,27 @@
+﻿{
+  "name": "zsyLearnC Debian13 Dev",
+  "build": {
+    "context": "..",
+    "dockerfile": "../Containerfile"
+  },
+  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+  "remoteUser": "root",
+  "runArgs": [
+    "--cpus=4",
+    "--memory=8g",
+    "--hostname=rk3588"
+  ],
+  "containerEnv": {
+    "TZ": "Asia/Shanghai"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools"
+      ]
+    }
+  },
+  "postCreateCommand": "bash -lc 'cmake -S /workspace -B /workspace/build-podman -DCMAKE_BUILD_TYPE=Release || true'"
+}

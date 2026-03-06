@@ -281,3 +281,61 @@ zsyLearnC/
 - 新增线程角色时，按 `src/nodeX` + `include/nodeX` 新建目录，不改 `common` 的业务语义。
 - `common` 仅放可复用能力，不放节点特有规则。
 - `app` 层只做组合编排，不写底层 gRPC 细节。
+
+## 13. Dev Container 开发（VS Code）
+
+项目已提供配置文件：
+- `.devcontainer/devcontainer.json`
+
+该配置会：
+- 使用仓库根目录的 `Containerfile` 构建开发容器
+- 工作目录固定为 `/workspace`
+- 容器资源固定为 `4 CPU / 8GB`
+
+### 13.1 一步进入 Dev Container
+
+1) 在 VS Code 打开本项目目录。
+2) 执行命令：`Dev Containers: Reopen in Container`。
+3) 第一次会自动 build，完成后进入容器开发环境。
+
+### 13.2 你这类日志“停在 usermod -aG docker ubuntu”怎么处理
+
+你给的日志说明 VS Code 在 WSL 里尝试把用户加入 `docker` 组。通常这一步后需要重启 WSL 会话。
+
+在 Windows PowerShell 执行：
+
+```powershell
+wsl --shutdown
+```
+
+重新打开 VS Code 后，先自检（PowerShell）：
+
+```powershell
+wsl -d Ubuntu-22.04 -e sh -lc "id -nG"
+wsl -d Ubuntu-22.04 -e sh -lc "docker info --format '{{.ServerVersion}} {{.OperatingSystem}}'"
+```
+
+若第一条输出包含 `docker`，第二条有版本信息，则环境正常，再执行 `Reopen in Container`。
+
+### 13.3 如果仍然卡住
+
+1) 先在 WSL 验证 `docker` 是否可用：
+
+```powershell
+wsl -d Ubuntu-22.04 -e sh -lc "docker ps"
+```
+
+2) 如果不可用，先修复 WSL 内 docker，再尝试 Dev Container。
+
+3) 如果可用但 VS Code 仍卡住，执行：
+- `Dev Containers: Rebuild and Reopen in Container`
+
+### 13.4 Dev Container 内编译运行
+
+进入 Dev Container 终端后，直接执行：
+
+```bash
+cmake -S /workspace -B /workspace/build-podman -DCMAKE_BUILD_TYPE=Release
+cmake --build /workspace/build-podman -j"$(nproc)"
+/workspace/build-podman/pingpong_demo
+```
