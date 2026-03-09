@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LM Studio Windows 10 本地大模型完整教程</title>
+  <style>
+    :root {
+      --bg: #0e1116;
+      --panel: #151a22;
+      --text: #ecf1f8;
+      --sub: #a9b7cc;
+      --line: #293448;
+      --accent: #44c2ff;
+      --ok: #71d59f;
+      --warn: #ffb454;
+      --bad: #ff7b72;
+      --code: #0b0f15;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--text); }
+    body { font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif; line-height: 1.65; }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 24px; }
+    .hero {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: linear-gradient(140deg, #121a2a, #141924 58%, #12161f);
+      padding: 22px;
+      margin-bottom: 18px;
+    }
+    .hero h1 { margin: 0 0 8px; font-size: 30px; }
+    .hero p { margin: 6px 0; color: var(--sub); }
+    .pill {
+      display: inline-block;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 3px 10px;
+      margin-right: 8px;
+      margin-top: 8px;
+      font-size: 12px;
+      color: #cae4ff;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 18px;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel);
+      padding: 16px;
+    }
+    .sticky { position: sticky; top: 12px; height: fit-content; }
+    .toc a {
+      display: block;
+      text-decoration: none;
+      color: #bcd0e9;
+      padding: 4px 0;
+      font-size: 14px;
+    }
+    .toc a:hover { color: #fff; }
+    h2 { margin-top: 0; margin-bottom: 10px; font-size: 24px; }
+    h3 { margin-bottom: 8px; margin-top: 18px; font-size: 18px; }
+    p, li { color: #dbe6f4; }
+    ul, ol { padding-left: 20px; }
+    .note {
+      border-left: 3px solid var(--accent);
+      background: #0f1c2f;
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: #d6e9ff;
+      margin: 10px 0;
+    }
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+    code, pre {
+      font-family: "JetBrains Mono", Consolas, "Courier New", monospace;
+      font-size: 13px;
+    }
+    pre {
+      background: var(--code);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px;
+      overflow-x: auto;
+      margin: 10px 0;
+      line-height: 1.5;
+    }
+    .hl {
+      background: #183251;
+      display: inline-block;
+      border-radius: 4px;
+      padding: 0 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #1a2231; }
+    .footer {
+      margin-top: 18px;
+      color: var(--sub);
+      font-size: 13px;
+    }
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+      .sticky { position: static; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <h1>LM Studio 在 Windows 10 本地玩大模型：从 0 到 1 完整教程</h1>
+      <p>适合刚入门本地大模型的开发者。目标是让你在本机稳定跑起来，并能调用本地 API 做自己的工具。</p>
+      <p>最后更新：2026-03-07。不同版本界面可能有小改动，但核心流程一致。</p>
+      <span class="pill">Windows 10</span>
+      <span class="pill">LM Studio</span>
+      <span class="pill">本地离线推理</span>
+      <span class="pill">OpenAI 兼容 API</span>
+    </header>
+
+    <div class="layout">
+      <aside class="card sticky toc">
+        <h3 style="margin-top: 0;">目录</h3>
+        <a href="#goal">1. 你将得到什么</a>
+        <a href="#prepare">2. 安装前准备</a>
+        <a href="#install">3. 安装 LM Studio</a>
+        <a href="#model">4. 选模型与量化</a>
+        <a href="#chat">5. 第一次本地对话</a>
+        <a href="#params">6. 推理参数讲透</a>
+        <a href="#hw">6.1 9700X+RTX5070 推荐</a>
+        <a href="#api">7. 本地 API 服务</a>
+        <a href="#perf">8. 性能优化</a>
+        <a href="#errors">9. 常见错误排查</a>
+        <a href="#openclaw-run">10. OpenClaw 启停与自启动</a>
+        <a href="#next">11. 进阶玩法</a>
+        <a href="#cppprompt">12. C++提问模板</a>
+        <a href="#ask">13. 问我就用这份模板</a>
+      </aside>
+
+      <main>
+        <section id="goal" class="card">
+          <h2>1. 你将得到什么</h2>
+          <ul>
+            <li>会安装并配置 LM Studio。</li>
+            <li>会按硬件选择合适模型（避免“能下不能跑”）。</li>
+            <li>会设置温度、上下文长度、采样等关键参数。</li>
+            <li>会启动本地 OpenAI 兼容 API 并在 PowerShell/Python 调用。</li>
+            <li>遇到报错知道先查哪里、怎么快速定位。</li>
+          </ul>
+        </section>
+
+        <section id="prepare" class="card" style="margin-top: 16px;">
+          <h2>2. 安装前准备</h2>
+          <h3>2.1 最低建议配置</h3>
+          <table>
+            <thead>
+              <tr><th>资源</th><th>建议</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>系统</td><td>Windows 10 x64</td><td>建议更新到较新补丁版本</td></tr>
+              <tr><td>内存</td><td>至少 16GB</td><td>8GB 也能跑小模型，但体验有限</td></tr>
+              <tr><td>显卡</td><td>NVIDIA 6GB+ 显存更好</td><td>无独显可纯 CPU 跑，但速度慢</td></tr>
+              <tr><td>硬盘</td><td>至少 40GB 空间</td><td>模型文件很占空间</td></tr>
+            </tbody>
+          </table>
+
+          <h3>2.2 先做系统自检（PowerShell）</h3>
+          <pre><code>winver
+wmic cpu get name
+wmic computersystem get totalphysicalmemory
+nvidia-smi</code></pre>
+          <div class="note">
+            <strong>说明：</strong><br />
+            1) <code>nvidia-smi</code> 有输出说明驱动基本正常。<br />
+            2) 没有 NVIDIA 卡也能跑，直接走 CPU 推理即可。
+          </div>
+        </section>
+
+        <section id="install" class="card" style="margin-top: 16px;">
+          <h2>3. 安装 LM Studio</h2>
+          <ol>
+            <li>访问 LM Studio 官网并下载 Windows 安装包（建议从官网拿最新稳定版）。</li>
+            <li>双击安装，按默认选项完成。</li>
+            <li>首次启动时，允许应用通过防火墙（后续开本地 API 会用到）。</li>
+            <li>进入设置页，检查模型下载目录（建议放到大容量盘，如 <code>D:\models\lmstudio</code>）。</li>
+          </ol>
+          <h3>3.1 必做设置</h3>
+          <ul>
+            <li>模型目录：改到空间充足的磁盘。</li>
+            <li>自动更新：可开，但生产环境建议手动更新。</li>
+            <li>本地服务默认端口：记住（通常是 <code>1234</code>）。</li>
+          </ul>
+        </section>
+
+        <section id="model" class="card" style="margin-top: 16px;">
+          <h2>4. 选模型与量化（最关键）</h2>
+          <h3>4.1 先理解模型格式</h3>
+          <ul>
+            <li><strong>GGUF</strong>：本地推理最常见格式，适合 LM Studio。</li>
+            <li><strong>Instruct</strong>：聊天/问答场景优先选它。</li>
+            <li><strong>Base</strong>：偏底座模型，不适合直接聊天。</li>
+          </ul>
+
+          <h3>4.2 量化怎么选（Q4 / Q5 / Q8）</h3>
+          <table>
+            <thead>
+              <tr><th>量化</th><th>速度</th><th>质量</th><th>内存占用</th><th>建议</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Q4</td><td>快</td><td>中</td><td>低</td><td>入门首选，先跑起来</td></tr>
+              <tr><td>Q5</td><td>中</td><td>较好</td><td>中</td><td>综合平衡</td></tr>
+              <tr><td>Q8</td><td>慢</td><td>更好</td><td>高</td><td>硬件充足再考虑</td></tr>
+            </tbody>
+          </table>
+
+          <h3>4.3 按内存选模型大小（经验值）</h3>
+          <ul>
+            <li>8GB RAM：1B~3B 模型，Q4。</li>
+            <li>16GB RAM：7B 模型，Q4/Q5。</li>
+            <li>32GB RAM：14B 模型，Q4。</li>
+            <li>64GB RAM：32B 模型可尝试（仍建议先 Q4）。</li>
+          </ul>
+
+          <div class="note">
+            实战策略：<span class="hl">先选 7B Instruct + Q4</span> 跑通，再升级模型，不要一开始就冲大模型。
+          </div>
+        </section>
+
+        <section id="chat" class="card" style="margin-top: 16px;">
+          <h2>5. 第一次本地对话（完整步骤）</h2>
+          <ol>
+            <li>在 LM Studio 里打开模型发现/下载页面，下载一个 7B Instruct GGUF（Q4）。</li>
+            <li>下载完成后，进入聊天页加载模型。</li>
+            <li>确认模型状态是 “Loaded/Ready”。</li>
+            <li>发第一条消息测试：
+              <pre><code>请用 5 条要点解释什么是 gRPC，并给出一个 C++ 的最小调用流程。</code></pre>
+            </li>
+            <li>如果能持续返回内容，说明本地推理链路已打通。</li>
+          </ol>
+        </section>
+
+        <section id="params" class="card" style="margin-top: 16px;">
+          <h2>6. 推理参数讲透（别再盲调）</h2>
+          <table>
+            <thead>
+              <tr><th>参数</th><th>作用</th><th>建议起点</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Temperature</td><td>越高越发散，越低越保守</td><td>0.7</td></tr>
+              <tr><td>Top P</td><td>控制采样范围</td><td>0.9</td></tr>
+              <tr><td>Max Tokens</td><td>最大输出长度</td><td>512~2048</td></tr>
+              <tr><td>Context Length</td><td>能记住的上下文窗口</td><td>4k 或 8k 起步</td></tr>
+              <tr><td>Repeat Penalty</td><td>抑制重复话术</td><td>1.05~1.15</td></tr>
+            </tbody>
+          </table>
+          <h3>6.1 常见场景预设</h3>
+          <ul>
+            <li>写代码：Temperature 0.2~0.5，输出更稳定。</li>
+            <li>创意写作：Temperature 0.8~1.0，表达更多样。</li>
+            <li>总结提炼：Temperature 0.2~0.4，减少胡扯概率。</li>
+          </ul>
+        </section>
+
+        <section id="hw" class="card" style="margin-top: 16px;">
+          <h2>6.1 按你的硬件给推荐（Windows10 + Ryzen 9700X + RTX5070 12GB）</h2>
+          <p>你的硬件属于本地推理的中高配，优先建议走 GPU 推理路线。</p>
+
+          <h3>推荐模型组合（按优先级）</h3>
+          <table>
+            <thead>
+              <tr><th>场景</th><th>推荐</th><th>量化建议</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>C++/工程问答</td>
+                <td>Coder Instruct 7B~14B</td>
+                <td>Q4_K_M / Q5_K_M</td>
+                <td>代码相关问题明显优于通用聊天模型</td>
+              </tr>
+              <tr>
+                <td>日常对话</td>
+                <td>通用 Instruct 7B~9B</td>
+                <td>Q4_K_M</td>
+                <td>速度快、显存压力小</td>
+              </tr>
+              <tr>
+                <td>高质量但可接受慢一些</td>
+                <td>14B Instruct/Coder</td>
+                <td>Q4_K_M</td>
+                <td>12GB 显存通常可尝试，但上下文别开太大</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>你这台机器的参数起步值（针对 C++）</h3>
+          <pre><code>temperature: 0.15 ~ 0.35
+top_p: 0.85 ~ 0.95
+max_tokens: 900 ~ 1600
+context_length: 4096 (稳定后可升到 8192)
+repeat_penalty: 1.05 ~ 1.12</code></pre>
+
+          <div class="note">
+            如果你主要问 C++，优先用 <span class="hl">Coder Instruct</span> 模型，不要只用通用聊天模型。<br />
+            同一个问题可让模型“输出：结论 + 代码 + 边界条件 + 复杂度”，答案会更工程化。
+          </div>
+        </section>
+
+        <section id="api" class="card" style="margin-top: 16px;">
+          <h2>7. 打开本地 API（OpenAI 兼容）</h2>
+          <h3>7.1 在 LM Studio 内启动服务</h3>
+          <ol>
+            <li>进入 Developer / Local Server 页面。</li>
+            <li>选择已加载模型作为默认模型。</li>
+            <li>点击 Start Server。</li>
+            <li>确认监听地址（通常：<code>http://127.0.0.1:1234</code>）。</li>
+          </ol>
+
+          <h3>7.2 PowerShell 调用示例（推荐写法，直接打印答案）</h3>
+          <pre><code>$body = @{
+  model = "qwen/qwen3.5-9b"
+  messages = @(
+    @{ role = "system"; content = "你是一个资深C++工程师。回答时先给结论，再给关键代码，最后给注意事项。" }
+    @{ role = "user"; content = "解释protobuf和gRPC关系，并给最小C++调用流程" }
+  )
+  temperature = 0.2
+  max_tokens = 1200
+  stream = $false
+} | ConvertTo-Json -Depth 8
+
+$resp = Invoke-RestMethod `
+  -Uri "http://127.0.0.1:1234/v1/chat/completions" `
+  -Method Post `
+  -ContentType "application/json" `
+  -Body $body
+
+# 关键：直接取 content，不要只看对象摘要
+$msg = $resp.choices[0].message
+
+if ($msg.content -and $msg.content.Trim().Length -gt 0) {
+  $msg.content
+} elseif ($msg.reasoning_content) {
+  "[提示] 只返回了 reasoning_content，没有最终答案："
+  $msg.reasoning_content
+} else {
+  "[调试] 未取到正文，打印完整返回："
+  $resp | ConvertTo-Json -Depth 20
+}
+
+"finish_reason = $($resp.choices[0].finish_reason)"</code></pre>
+          <div class="note">
+            你的截图里出现 <code>finish_reason=length</code>，说明被 <code>max_tokens</code> 截断了。把 <code>max_tokens</code> 提高到 800~1600 更稳。
+          </div>
+
+          <h3>7.3 Python (OpenAI SDK) 调用示例</h3>
+          <pre><code>from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://127.0.0.1:1234/v1",
+    api_key="lm-studio"
+)
+
+resp = client.chat.completions.create(
+    model="your-loaded-model",
+    messages=[
+        {"role": "system", "content": "你是一个简洁技术助手"},
+        {"role": "user", "content": "给我一个CMake最小示例"}
+    ],
+    temperature=0.4
+)
+
+print(resp.choices[0].message.content)</code></pre>
+
+          <div class="note">
+            只要你的工具支持 OpenAI 兼容接口，就可以把 base URL 改成本地地址来接 LM Studio。
+          </div>
+        </section>
+
+        <section id="perf" class="card" style="margin-top: 16px;">
+          <h2>8. 性能优化（提速最有效的做法）</h2>
+          <ol>
+            <li>先把模型降一级（比如从 14B 降到 7B）。</li>
+            <li>量化改到 Q4 再试。</li>
+            <li>降低 context length（8k 降到 4k）。</li>
+            <li>尽量使用 GPU 加速（如果可选）。</li>
+            <li>关闭其他吃内存的大应用（浏览器、IDE 多窗口、虚拟机）。</li>
+          </ol>
+          <h3>判断是否“配置过重”</h3>
+          <ul>
+            <li>加载模型特别慢或直接失败。</li>
+            <li>对话首 token 出得很慢（比如超过 10~20 秒）。</li>
+            <li>系统明显卡顿、频繁占满内存/页面文件。</li>
+          </ul>
+        </section>
+
+        <section id="errors" class="card" style="margin-top: 16px;">
+          <h2>9. 常见错误排查</h2>
+
+          <h3>9.1 端口被占用（API 启动失败）</h3>
+          <p class="bad">现象：</p>
+          <p>启动本地服务时报端口冲突（常见 1234）。</p>
+          <p class="ok">处理：</p>
+          <pre><code>netstat -ano | findstr :1234
+taskkill /PID &lt;占用进程PID&gt; /F</code></pre>
+
+          <h3>9.2 模型下载成功但加载失败</h3>
+          <p class="bad">原因常见：</p>
+          <ul>
+            <li>模型过大，内存/显存不够。</li>
+            <li>下载文件损坏或不完整。</li>
+          </ul>
+          <p class="ok">处理：</p>
+          <ul>
+            <li>换同模型更小量化（Q4）。</li>
+            <li>重新下载模型文件。</li>
+            <li>先用小模型确认软件链路没问题。</li>
+          </ul>
+
+          <h3>9.3 输出特别慢</h3>
+          <ul>
+            <li>降低模型规模与上下文长度。</li>
+            <li>降低最大输出 token。</li>
+            <li>确认是否真的启用了 GPU 加速。</li>
+          </ul>
+
+          <h3>9.4 中文在终端乱码（PowerShell）</h3>
+          <pre><code>chcp 65001</code></pre>
+          <p>并尽量使用 UTF-8 文件与终端。</p>
+
+          <h3>9.5 API 调用 404 / 401 / 500</h3>
+          <ul>
+            <li>404：URL 路径写错（确认是 <code>/v1/chat/completions</code>）。</li>
+            <li>401：部分工具强制校验 API Key，填任意字符串即可（例如 <code>lm-studio</code>）。</li>
+            <li>500：模型未加载或服务端内部错误，先在 LM Studio 界面确认模型状态。</li>
+          </ul>
+
+          <h3>9.6 返回看起来“没答案”，只看到 <code>finish_reason=length</code></h3>
+          <p class="bad">现象：</p>
+          <ul>
+            <li>PowerShell 里只看到 <code>choices : @{index=0; message=; ...}</code></li>
+            <li><code>finish_reason=length</code></li>
+          </ul>
+          <p class="ok">根因：</p>
+          <ul>
+            <li>对象摘要输出没有展开 <code>message.content</code>。</li>
+            <li><code>max_tokens</code> 太小导致被截断。</li>
+          </ul>
+          <p class="ok">处理：</p>
+          <pre><code>$resp.choices[0].message.content
+$resp.choices[0].finish_reason
+$resp | ConvertTo-Json -Depth 20</code></pre>
+          <ul>
+            <li>把 <code>max_tokens</code> 提高到 800~1600。</li>
+            <li>针对 C++ 问题，把 system prompt 固定为“资深C++工程师”。</li>
+            <li>优先使用 Coder Instruct 模型。</li>
+          </ul>
+        </section>
+
+        <section id="openclaw-run" class="card" style="margin-top: 16px;">
+          <h2>10. OpenClaw 如何关闭运行、会不会开机自动运行</h2>
+          <h3>10.1 先判断当前是“手动运行”还是“系统服务运行”</h3>
+          <pre><code>openclaw.cmd gateway status</code></pre>
+          <ul>
+            <li>如果看到 <code>Service: Scheduled Task (missing)</code>：说明没有安装为系统服务，默认不会开机自启。</li>
+            <li>如果看到 service 已安装并 running：说明可能会被系统拉起（取决于任务计划配置）。</li>
+          </ul>
+
+          <h3>10.2 关闭 OpenClaw（按启动方式分别处理）</h3>
+          <p><strong>A. 你在当前终端前台运行了 <code>openclaw.cmd gateway run</code></strong></p>
+          <ul>
+            <li>直接在那个终端按 <code>Ctrl + C</code> 即可停止。</li>
+          </ul>
+          <p><strong>B. 网关在后台运行（你不知道在哪个终端）</strong></p>
+          <pre><code>netstat -ano | findstr :18789
+taskkill /PID &lt;PID&gt; /F</code></pre>
+          <p><strong>C. 已安装为系统服务（Scheduled Task）</strong></p>
+          <pre><code>openclaw.cmd gateway stop</code></pre>
+
+          <h3>10.3 开机自启动管理</h3>
+          <p>安装系统服务（需要管理员 PowerShell）：</p>
+          <pre><code>openclaw.cmd gateway install
+openclaw.cmd gateway start
+openclaw.cmd gateway status</code></pre>
+          <p>取消自启动（卸载服务）：</p>
+          <pre><code>openclaw.cmd gateway stop
+openclaw.cmd gateway uninstall</code></pre>
+
+          <h3>10.4 你当前场景的结论（可对照）</h3>
+          <ul>
+            <li>你之前日志里出现了 <code>Gateway service missing</code>，这代表没装服务，不会开机自动运行。</li>
+            <li>但端口 <code>18789</code> 被占用，说明当时有一个手动启动的 Node 网关进程在跑。</li>
+          </ul>
+        </section>
+
+        <section id="next" class="card" style="margin-top: 16px;">
+          <h2>11. 进阶玩法</h2>
+          <ul>
+            <li>为不同任务准备不同模型预设（代码、总结、翻译、写作）。</li>
+            <li>把 LM Studio API 接到你自己的工具链（脚本、编辑器插件、Agent）。</li>
+            <li>做“私有知识库问答”：先做文档切片，再把检索结果喂给本地模型。</li>
+            <li>在离线环境里跑安全审阅场景（不出网数据）。</li>
+          </ul>
+        </section>
+
+        <section id="cppprompt" class="card" style="margin-top: 16px;">
+          <h2>12. C++问题提问模板（直接复制）</h2>
+          <pre><code>你是资深C++工程师。请按以下格式回答：
+1) 先给结论（3条以内）
+2) 给可编译示例代码（C++17）
+3) 解释关键点（内存、线程安全、异常、复杂度）
+4) 给常见坑和修复建议
+
+我的问题：
+【在这里写你的具体问题】
+
+我的环境：
+- OS: Windows 10
+- 编译器: MSVC/GCC/Clang（写明版本）
+- 标准: C++17
+- 约束: 是否可用第三方库（写清楚）</code></pre>
+          <div class="note">
+            不要只问“解释一下XX”。把 <span class="hl">目标 + 环境 + 约束 + 期望输出格式</span> 写清楚，答案质量会明显提升。
+          </div>
+        </section>
+
+        <section id="ask" class="card" style="margin-top: 16px;">
+          <h2>13. 你接下来可以直接问我</h2>
+          <p>复制任意一句给我，我会按你的机器配置给出可执行方案：</p>
+          <ol>
+            <li>“我这台机器是 XX CPU + XX 内存 + XX 显卡，给我推荐 3 个最稳模型。”</li>
+            <li>“帮我做一套 LM Studio 参数预设：写代码 / 总结文档 / 创意写作。”</li>
+            <li>“我要把 VS Code 插件接到 LM Studio 本地 API，给我逐步配置。”</li>
+            <li>“我现在报错是 XXX，把排查命令按优先级列给我。”</li>
+          </ol>
+        </section>
+
+        <p class="footer">提示：本教程文件是纯静态 HTML，可直接双击打开离线阅读。</p>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

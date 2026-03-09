@@ -6,7 +6,7 @@ namespace node2 {
 
 Node2Sender::Node2Sender(common::GrpcMessageClient& client,
                          common::TurnCoordinator& coordinator, int rounds,
-                         std::chrono::seconds interval)
+                         std::chrono::milliseconds interval)
     : client_(client),
       coordinator_(coordinator),
       rounds_(rounds),

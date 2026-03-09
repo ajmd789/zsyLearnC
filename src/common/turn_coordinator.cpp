@@ -13,6 +13,9 @@ Turn TurnCoordinator::WaitFor(Turn expected_turn) {
 void TurnCoordinator::SetTurn(Turn next_turn) {
   {
     std::lock_guard<std::mutex> lock(mutex_);
+    if (turn_ == Turn::Done && next_turn != Turn::Done) {
+      return;
+    }
     turn_ = next_turn;
   }
   cv_.notify_all();

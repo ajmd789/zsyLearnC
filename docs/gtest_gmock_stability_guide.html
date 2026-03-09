@@ -1,0 +1,1154 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>zsyLearnC 在 Debian Dev Container 中集成 gtest/gmock 与稳定性测试</title>
+  <style>
+    :root {
+      --bg: #08111d;
+      --panel: rgba(12, 23, 39, 0.9);
+      --panel-strong: rgba(16, 31, 53, 0.96);
+      --text: #e7eef8;
+      --muted: #9db0c7;
+      --line: #243855;
+      --accent: #5bd0ff;
+      --accent-2: #8ef0c9;
+      --warn: #ffbf69;
+      --bad: #ff7d7d;
+      --ok: #8fe388;
+      --code: #071019;
+      --shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      background:
+        radial-gradient(circle at top left, rgba(43, 91, 132, 0.32), transparent 32%),
+        radial-gradient(circle at right 20%, rgba(22, 120, 112, 0.18), transparent 24%),
+        linear-gradient(180deg, #09111d 0%, #071019 100%);
+      color: var(--text);
+    }
+    body {
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.68;
+    }
+    .wrap {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .hero {
+      padding: 26px;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background:
+        linear-gradient(145deg, rgba(20, 34, 57, 0.98), rgba(11, 22, 37, 0.95) 62%, rgba(9, 18, 30, 0.98));
+      box-shadow: var(--shadow);
+      margin-bottom: 18px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      width: 320px;
+      height: 320px;
+      right: -90px;
+      top: -110px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(91, 208, 255, 0.2), transparent 68%);
+      pointer-events: none;
+    }
+    .hero h1 {
+      margin: 0 0 10px;
+      font-size: 31px;
+      line-height: 1.28;
+    }
+    .hero p {
+      margin: 8px 0;
+      color: var(--muted);
+      max-width: 900px;
+    }
+    .pill {
+      display: inline-block;
+      margin-right: 8px;
+      margin-top: 10px;
+      padding: 4px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: #d9f4ff;
+      font-size: 12px;
+      background: rgba(13, 28, 46, 0.7);
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      padding: 18px;
+      backdrop-filter: blur(8px);
+    }
+    .sticky {
+      position: sticky;
+      top: 12px;
+      height: fit-content;
+    }
+    .toc h3 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      font-size: 18px;
+    }
+    .toc a {
+      display: block;
+      color: #bdd0e7;
+      text-decoration: none;
+      padding: 5px 0;
+      font-size: 14px;
+    }
+    .toc a:hover { color: #ffffff; }
+    h2 {
+      margin: 0 0 10px;
+      font-size: 24px;
+      line-height: 1.3;
+    }
+    h3 {
+      margin: 16px 0 8px;
+      font-size: 18px;
+      line-height: 1.35;
+    }
+    p, li { color: #dbe7f4; }
+    ul, ol { padding-left: 20px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      vertical-align: top;
+      text-align: left;
+    }
+    th {
+      background: rgba(23, 39, 63, 0.98);
+      color: #eef6ff;
+    }
+    tr:nth-child(even) td {
+      background: rgba(11, 21, 35, 0.55);
+    }
+    code, pre {
+      font-family: "JetBrains Mono", Consolas, "Courier New", monospace;
+      font-size: 13px;
+    }
+    pre {
+      margin: 10px 0 12px;
+      padding: 13px 14px;
+      overflow-x: auto;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: var(--code);
+      line-height: 1.56;
+    }
+    code {
+      color: #dff7ff;
+    }
+    .note, .tip, .warnbox {
+      border-radius: 12px;
+      padding: 11px 13px;
+      margin: 12px 0;
+    }
+    .note {
+      border-left: 3px solid var(--accent);
+      background: rgba(12, 33, 53, 0.88);
+    }
+    .tip {
+      border-left: 3px solid var(--accent-2);
+      background: rgba(11, 36, 35, 0.9);
+    }
+    .warnbox {
+      border-left: 3px solid var(--warn);
+      background: rgba(51, 34, 11, 0.88);
+    }
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .mini {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      background: rgba(11, 22, 36, 0.66);
+    }
+    .flow {
+      white-space: pre-wrap;
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 13px;
+      border: 1px dashed var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(6, 16, 28, 0.9);
+    }
+    .footer {
+      margin-top: 18px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+      .grid-2 { grid-template-columns: 1fr; }
+      .sticky { position: static; }
+      .hero h1 { font-size: 27px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <h1>zsyLearnC 在 Debian Dev Container 中集成 gtest/gmock 与稳定性测试</h1>
+      <p>这份文档不是泛泛讲测试框架，而是直接针对你当前这个仓库：<code>CMake + C++17 + gRPC + Debian 13 Dev Container</code>。重点回答 4 个问题：<code>gtest 能不能 mock</code>、<code>为什么 doctest 不够</code>、<code>你这个项目先改哪里</code>、<code>程序跑起来以后怎么验证稳定性</code>。</p>
+      <p>文档基线时间：2026-03-08。版本信息以 Debian 13 stable（trixie）官方包页面为准；如果你的容器已经做过镜像更新，最终以容器内 <code>apt-cache policy</code> 为准。</p>
+      <span class="pill">项目: zsyLearnC</span>
+      <span class="pill">容器: Debian 13</span>
+      <span class="pill">测试框架: GoogleTest / GoogleMock</span>
+      <span class="pill">目标: mock + 稳定性</span>
+    </header>
+
+    <div class="layout">
+      <aside class="card sticky toc">
+        <h3>目录</h3>
+        <a href="#answer">1. 先给结论</a>
+        <a href="#current">2. 当前仓库现状</a>
+        <a href="#versions">3. 建议安装的软件与版本</a>
+        <a href="#container">4. Dev Container 里先做什么</a>
+        <a href="#refactor">5. 先抽哪些接口才能 mock</a>
+        <a href="#cmake">6. CMake 接入步骤</a>
+        <a href="#first-tests">7. 第一批测试怎么写</a>
+        <a href="#integration">8. 集成测试怎么做</a>
+        <a href="#stability">9. 稳定性测试怎么开展</a>
+        <a href="#pitfalls">10. 常见坑</a>
+        <a href="#plan">11. 推荐推进顺序</a>
+        <a href="#refs">12. 版本来源</a>
+        <a href="#soak-guide">13. 容器内 Soak Test 运行与资源观测</a>
+      </aside>
+
+      <main>
+        <section id="answer" class="card">
+          <h2>1. 先给结论</h2>
+          <div class="grid-2">
+            <div class="mini">
+              <h3 style="margin-top: 0;">1.1 gtest 能 mock 吗</h3>
+              <p>严格说，<code>GoogleTest</code> 负责断言、测试运行和报告；<code>GoogleMock</code> 负责 mock。它们属于同一套 <code>googletest</code> 项目，工程里一般一起用。</p>
+            </div>
+            <div class="mini">
+              <h3 style="margin-top: 0;">1.2 doctest 能 mock 吗</h3>
+              <p><code>doctest</code> 本身不是 mock 框架。你可以把它和别的 mocking library 配合，但如果你已经明确需要 mock，并且要做线程/失败路径/稳定性验证，直接切到 <code>gtest + gmock</code> 更省事。</p>
+            </div>
+          </div>
+
+          <div class="note">
+            <strong>本项目的关键判断：</strong><br />
+            你当前仓库里最值得先 mock 的不是 gRPC 本身，而是 <code>GrpcMessageClient</code>、睡眠行为和时间来源。否则单元测试会慢、脆、难覆盖失败路径。
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>问题</th>
+                <th>建议</th>
+                <th>原因</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>只想写断言，不需要 mock</td>
+                <td>doctest 也能用</td>
+                <td>轻量、上手快</td>
+              </tr>
+              <tr>
+                <td>需要 mock 依赖、验证调用顺序、造失败场景</td>
+                <td>用 gtest + gmock</td>
+                <td>官方组合成熟，和 CMake/CTest 集成顺手</td>
+              </tr>
+              <tr>
+                <td>要关注程序跑起来后的稳定性</td>
+                <td>单元测试 + 集成测试 + sanitizer + soak test 一起做</td>
+                <td>只做 mock 不能发现内存、线程、长时间运行问题</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="current" class="card" style="margin-top: 16px;">
+          <h2>2. 当前仓库现状</h2>
+          <p>从现有代码看，你的主干逻辑集中在这些文件：</p>
+          <ul>
+            <li><code>src/app/pingpong_app.cpp</code>：整体编排，固定端口、固定轮数、固定 5 秒间隔。</li>
+            <li><code>src/common/grpc_message_client.cpp</code>：真实 gRPC client，直接发 RPC，失败时只记日志。</li>
+            <li><code>src/common/messenger_service.cpp</code>：真实 gRPC server handler。</li>
+            <li><code>src/node1/node1_sender.cpp</code>、<code>src/node2/node2_sender.cpp</code>：线程发送逻辑。</li>
+            <li><code>src/common/turn_coordinator.cpp</code>：线程间轮次协调。</li>
+          </ul>
+
+          <table>
+            <thead>
+              <tr>
+                <th>当前实现</th>
+                <th>对测试的影响</th>
+                <th>建议</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>Node1Sender/Node2Sender</code> 直接依赖具体类 <code>GrpcMessageClient</code></td>
+                <td>没法用 gmock 替换依赖，单元测试难写</td>
+                <td>抽 <code>IMessageClient</code> 接口</td>
+              </tr>
+              <tr>
+                <td>代码里直接 <code>std::this_thread::sleep_for(interval_)</code></td>
+                <td>测试真的要等 5 秒，速度非常差</td>
+                <td>抽 <code>ISleeper</code> 或传入 sleep 回调</td>
+              </tr>
+              <tr>
+                <td><code>CurrentTimeString()</code> 是自由函数</td>
+                <td>日志内容难稳定断言</td>
+                <td>抽 <code>ITimeProvider</code> 或别在单元测试里直接断完整日志</td>
+              </tr>
+              <tr>
+                <td>端口和轮数写死在 <code>PingPongApp::Run()</code></td>
+                <td>集成测试容易撞端口，也不方便压测</td>
+                <td>引入 <code>AppConfig</code></td>
+              </tr>
+              <tr>
+                <td><code>Send()</code> 失败只返回 <code>false</code>，上层未处理</td>
+                <td>失败路径行为不明确</td>
+                <td>明确“重试/终止/告警”策略并补测试</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="warnbox">
+            <strong>一个很重要的现实：</strong><br />
+            <code>gmock</code> 并不能“直接” mock 任意 C++ 代码。它最擅长 mock 虚函数接口。像自由函数、构造函数、非虚成员函数、全局单例，通常都要先加一层 adapter 或接口。
+          </div>
+        </section>
+
+        <section id="versions" class="card" style="margin-top: 16px;">
+          <h2>3. 建议安装的软件与版本</h2>
+          <p>下面是适合写进文档、也适合在容器里固定下来的版本基线。由于 Debian 不同架构包可能带 <code>+b1</code> 这类后缀，表里优先写源码/主版本。</p>
+
+          <table>
+            <thead>
+              <tr>
+                <th>软件</th>
+                <th>建议版本基线</th>
+                <th>用途</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Debian</td>
+                <td>13 stable（trixie）</td>
+                <td>Dev Container 基础系统</td>
+              </tr>
+              <tr>
+                <td>CMake</td>
+                <td>3.31.6-2</td>
+                <td>配置、构建、测试注册</td>
+              </tr>
+              <tr>
+                <td>GCC / G++</td>
+                <td>14.2.0-19（<code>g++-14</code>）</td>
+                <td>C++17 编译</td>
+              </tr>
+              <tr>
+                <td>Ninja</td>
+                <td>1.12.1-1</td>
+                <td>更快的构建后端</td>
+              </tr>
+              <tr>
+                <td>GoogleTest / GoogleMock</td>
+                <td>1.16.0-1</td>
+                <td>单元测试与 mock</td>
+              </tr>
+              <tr>
+                <td>gRPC C++</td>
+                <td>1.51.1-6（<code>libgrpc++-dev</code>）</td>
+                <td>项目现有 RPC 依赖</td>
+              </tr>
+              <tr>
+                <td>Protocol Buffers</td>
+                <td>3.21.12-11</td>
+                <td>现有 proto 生成与链接</td>
+              </tr>
+              <tr>
+                <td>protobuf gRPC plugin</td>
+                <td>1.51.1-6（<code>protobuf-compiler-grpc</code>）</td>
+                <td><code>grpc_cpp_plugin</code></td>
+              </tr>
+              <tr>
+                <td>Valgrind</td>
+                <td>3.24.0-3</td>
+                <td>内存与线程问题排查</td>
+              </tr>
+              <tr>
+                <td>gcovr</td>
+                <td>7.2+really-1.1</td>
+                <td>覆盖率汇总</td>
+              </tr>
+              <tr>
+                <td>lcov</td>
+                <td>2.3.1-1</td>
+                <td>HTML 覆盖率报告</td>
+              </tr>
+              <tr>
+                <td>clang-tidy</td>
+                <td>1:19.0-63</td>
+                <td>静态检查</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>3.1 容器里建议安装命令</h3>
+          <pre><code>apt-get update &amp;&amp; apt-get install -y --no-install-recommends \
+  build-essential \
+  gcc-14 g++-14 \
+  cmake ninja-build git ca-certificates pkg-config \
+  libgrpc++-dev libprotobuf-dev protobuf-compiler protobuf-compiler-grpc \
+  libgtest-dev libgmock-dev googletest \
+  valgrind gcovr lcov clang-tidy \
+  &amp;&amp; rm -rf /var/lib/apt/lists/*</code></pre>
+
+          <h3>3.2 建议把 Containerfile 也同步补上</h3>
+          <pre><code>RUN apt-get update &amp;&amp; apt-get install -y --no-install-recommends \
+  build-essential \
+  gcc-14 g++-14 \
+  cmake \
+  ninja-build \
+  git \
+  ca-certificates \
+  pkg-config \
+  libgrpc++-dev \
+  libprotobuf-dev \
+  protobuf-compiler \
+  protobuf-compiler-grpc \
+  libgtest-dev \
+  libgmock-dev \
+  googletest \
+  valgrind \
+  gcovr \
+  lcov \
+  clang-tidy \
+  &amp;&amp; rm -rf /var/lib/apt/lists/*</code></pre>
+
+          <div class="tip">
+            如果你不想在系统包和上游 release 之间来回漂，<code>googletest</code> 最好固定一个版本。这个项目里直接用 Debian 13 的包版本即可，不需要额外 Fetch 一个更新版。
+          </div>
+        </section>
+
+        <section id="container" class="card" style="margin-top: 16px;">
+          <h2>4. Dev Container 里先做什么</h2>
+          <p>你的仓库已经有 <code>.devcontainer/devcontainer.json</code>，并且通过根目录 <code>Containerfile</code> 构建。建议把事情拆成 4 步，而不是一口气全改。</p>
+
+          <ol>
+            <li>先补容器依赖并重建 Dev Container。</li>
+            <li>先让当前项目在新镜像里仍然可以正常编译运行。</li>
+            <li>再接入 <code>BUILD_TESTING</code>、<code>CTest</code>、第一个测试目标。</li>
+            <li>最后才重构可 mock 的接口，否则你会一边改架构一边怀疑环境。</li>
+          </ol>
+
+          <h3>4.1 先自检版本</h3>
+          <pre><code>cat /etc/os-release
+cmake --version
+g++-14 --version
+protoc --version
+grpc_cpp_plugin --version || true
+dpkg -l | grep -E 'gtest|gmock|grpc|protobuf|valgrind|gcovr|lcov'</code></pre>
+
+          <h3>4.2 先保证主程序仍然可编译</h3>
+          <pre><code>cmake -S /workspace -B /workspace/build-podman -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build /workspace/build-podman -j"$(nproc)"
+/workspace/build-podman/pingpong_demo</code></pre>
+        </section>
+
+        <section id="refactor" class="card" style="margin-top: 16px;">
+          <h2>5. 先抽哪些接口才能 mock</h2>
+          <p>这里不要从 <code>PingPongApp</code> 整体开始 mock。先从发送线程逻辑入手，收益最大。</p>
+
+          <h3>5.1 第一个接口：消息发送客户端</h3>
+          <pre><code>class IMessageClient {
+ public:
+  virtual ~IMessageClient() = default;
+  virtual bool Send(const std::string&amp; from,
+                    const std::string&amp; to,
+                    int sequence) = 0;
+};</code></pre>
+
+          <p>让现有的 <code>GrpcMessageClient</code> 实现这个接口，然后把 <code>Node1Sender</code> 和 <code>Node2Sender</code> 的构造函数参数从具体类改成接口引用。</p>
+
+          <pre><code>class GrpcMessageClient : public IMessageClient {
+ public:
+  GrpcMessageClient(const std::string&amp; target, ThreadSafeLogger&amp; logger);
+  bool Send(const std::string&amp; from,
+            const std::string&amp; to,
+            int sequence) override;
+};</code></pre>
+
+          <h3>5.2 第二个接口：睡眠行为</h3>
+          <pre><code>class ISleeper {
+ public:
+  virtual ~ISleeper() = default;
+  virtual void SleepFor(std::chrono::milliseconds duration) = 0;
+};</code></pre>
+
+          <p>原因很直接：你现在的发送线程每轮都真睡 5 秒。如果不把 sleep 抽出来，单元测试会慢得不可接受。</p>
+
+          <h3>5.3 第三个接口：时间来源</h3>
+          <p>这一步不是第一优先级，但如果你后面要认真测日志、超时、重试，最好把 <code>CurrentTimeString()</code> 包成时间提供者。</p>
+
+          <h3>5.4 第四个对象：App 配置</h3>
+          <pre><code>struct AppConfig {
+  std::string node1_server_addr = "0.0.0.0:50051";
+  std::string node2_server_addr = "0.0.0.0:50052";
+  std::string node1_target = "127.0.0.1:50051";
+  std::string node2_target = "127.0.0.1:50052";
+  int rounds = 10;
+  std::chrono::milliseconds interval{5000};
+  std::chrono::milliseconds startup_wait{500};
+};</code></pre>
+
+          <div class="note">
+            <strong>为什么这一步重要：</strong><br />
+            单元测试要把 <code>interval</code> 设成 <code>0ms</code>；集成测试要把端口改成测试专用端口；稳定性测试要把 <code>rounds</code> 放大，甚至支持无限循环。这些都不应该硬编码在 <code>PingPongApp::Run()</code> 里。
+          </div>
+
+          <h3>5.5 mock 示例</h3>
+          <pre><code>#include &lt;gmock/gmock.h&gt;
+
+class MockMessageClient : public IMessageClient {
+ public:
+  MOCK_METHOD(bool, Send,
+              (const std::string&amp;, const std::string&amp;, int),
+              (override));
+};
+
+class MockSleeper : public ISleeper {
+ public:
+  MOCK_METHOD(void, SleepFor, (std::chrono::milliseconds), (override));
+};</code></pre>
+        </section>
+
+        <section id="cmake" class="card" style="margin-top: 16px;">
+          <h2>6. CMake 接入步骤</h2>
+          <p>建议不要把所有生产代码都直接扔给测试目标。先把“可单元测试的逻辑”和“真实 runtime/gRPC 组装”拆开。</p>
+
+          <h3>6.1 建议的目标拆分</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>目标</th>
+                <th>内容</th>
+                <th>作用</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>pingpong_proto</code></td>
+                <td>protobuf/gRPC 生成代码</td>
+                <td>现有保留</td>
+              </tr>
+              <tr>
+                <td><code>pingpong_logic</code></td>
+                <td><code>TurnCoordinator</code>、<code>Node1Sender</code>、<code>Node2Sender</code> 等纯逻辑</td>
+                <td>供单元测试链接</td>
+              </tr>
+              <tr>
+                <td><code>pingpong_runtime</code></td>
+                <td><code>GrpcMessageClient</code>、<code>MessengerService</code>、<code>server_utils</code>、<code>PingPongApp</code></td>
+                <td>真实运行与集成测试</td>
+              </tr>
+              <tr>
+                <td><code>pingpong_demo</code></td>
+                <td><code>main.cpp</code></td>
+                <td>最终程序入口</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>6.2 最小接入片段</h3>
+          <pre><code>include(CTest)
+
+add_library(pingpong_logic
+  src/common/turn_coordinator.cpp
+  src/node1/node1_sender.cpp
+  src/node2/node2_sender.cpp
+)
+
+target_include_directories(pingpong_logic
+  PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+)
+
+target_link_libraries(pingpong_logic
+  PUBLIC
+    Threads::Threads
+)
+
+if(BUILD_TESTING)
+  find_package(GTest REQUIRED)
+  include(GoogleTest)
+
+  add_executable(pingpong_unit_tests
+    tests/unit/turn_coordinator_test.cpp
+    tests/unit/node1_sender_test.cpp
+    tests/unit/node2_sender_test.cpp
+  )
+
+  target_link_libraries(pingpong_unit_tests
+    PRIVATE
+      pingpong_logic
+      GTest::gtest
+      GTest::gmock
+      GTest::gtest_main
+  )
+
+  gtest_discover_tests(pingpong_unit_tests)
+endif()</code></pre>
+
+          <h3>6.3 常用构建命令</h3>
+          <pre><code>cmake -S /workspace -B /workspace/build-test -G Ninja -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Debug
+cmake --build /workspace/build-test -j"$(nproc)"
+ctest --test-dir /workspace/build-test --output-on-failure</code></pre>
+
+          <div class="tip">
+            如果 <code>find_package(GTest REQUIRED)</code> 在你的容器里不好使，通常不是 gtest 不存在，而是包配置路径没对上。此时优先查 <code>dpkg -L libgtest-dev</code>，再决定是否退到 <code>FetchContent</code>。不要一上来就怀疑 gmock 本身。
+          </div>
+        </section>
+
+        <section id="first-tests" class="card" style="margin-top: 16px;">
+          <h2>7. 第一批测试怎么写</h2>
+          <p>先别碰最复杂的 <code>PingPongApp</code>。第一批测试的目标是验证最容易出错、又最容易 mock 的逻辑。</p>
+
+          <h3>7.1 先写这 4 个</h3>
+          <ol>
+            <li><code>TurnCoordinator</code>：初始轮次是否正确，<code>SetTurn()</code> 后等待方是否被唤醒。</li>
+            <li><code>Node1Sender</code>：拿到轮次后是否调用 <code>Send("node1", "node2", round)</code>。</li>
+            <li><code>Node2Sender</code>：最后一轮是否把轮次切成 <code>Done</code>。</li>
+            <li>发送失败路径：如果 <code>Send()</code> 返回 <code>false</code>，程序下一步到底要继续、停止还是计数告警。</li>
+          </ol>
+
+          <h3>7.2 一个典型的 gmock 测试样子</h3>
+          <pre><code>using ::testing::InSequence;
+using ::testing::Return;
+
+TEST(Node1SenderTest, SendsCurrentRoundToNode2) {
+  MockMessageClient client;
+  MockSleeper sleeper;
+  common::TurnCoordinator coordinator(common::Turn::Node1ToNode2);
+
+  node1::Node1Sender sender(client, sleeper, coordinator, 1,
+                            std::chrono::milliseconds(0));
+
+  {
+    InSequence seq;
+    EXPECT_CALL(client, Send("node1", "node2", 1))
+        .WillOnce(Return(true));
+    EXPECT_CALL(sleeper, SleepFor(std::chrono::milliseconds(0)));
+  }
+
+  sender.Run();
+  EXPECT_EQ(coordinator.WaitFor(common::Turn::Node2ToNode1),
+            common::Turn::Node2ToNode1);
+}</code></pre>
+
+          <div class="warnbox">
+            如果你发现这个测试写不出来，不是 gmock 有问题，而是你的生产代码还没被设计成“可测试”。先改设计，再写测试。
+          </div>
+        </section>
+
+        <section id="integration" class="card" style="margin-top: 16px;">
+          <h2>8. 集成测试怎么做</h2>
+          <p>单元测试只解决“某个类逻辑对不对”。而你这个项目是 gRPC + 线程 + server/client 编排，至少还需要一层真实组件测试。</p>
+
+          <h3>8.1 建议的集成测试目标</h3>
+          <ul>
+            <li>真实启动 <code>MessengerService</code> 和 <code>GrpcMessageClient</code>，验证一轮 RPC 成功。</li>
+            <li>验证 server 正常启动和正常 shutdown，不残留线程。</li>
+            <li>验证错误端口、server 未启动时，client 是否能返回失败并记日志。</li>
+          </ul>
+
+          <h3>8.2 这里要改的两个点</h3>
+          <ol>
+            <li>不要把测试端口写死成 <code>50051/50052</code>。否则本地同时跑主程序和测试会撞端口。</li>
+            <li>最好支持动态端口，或者至少让测试显式传入专用端口。</li>
+          </ol>
+
+          <h3>8.3 推荐目录</h3>
+          <pre><code>tests/
+  unit/
+  integration/
+  soak/
+  mocks/
+  support/</code></pre>
+
+          <h3>8.4 一个更实用的判断标准</h3>
+          <p>对这个项目来说：</p>
+          <ul>
+            <li>单元测试不要真的开 gRPC server。</li>
+            <li>集成测试要开真实 gRPC server，但轮数和间隔要压到最小。</li>
+            <li>稳定性测试才允许长时间运行。</li>
+          </ul>
+        </section>
+
+        <section id="stability" class="card" style="margin-top: 16px;">
+          <h2>9. 稳定性测试怎么开展</h2>
+          <p>“程序跑起来以后稳定”这件事，不能只靠 mock。你至少要把验证分成 5 层。</p>
+
+          <table>
+            <thead>
+              <tr>
+                <th>层次</th>
+                <th>目的</th>
+                <th>工具 / 方法</th>
+                <th>建议频率</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>单元测试</td>
+                <td>逻辑正确、失败路径明确</td>
+                <td>gtest + gmock</td>
+                <td>每次改代码都跑</td>
+              </tr>
+              <tr>
+                <td>集成测试</td>
+                <td>真实 gRPC 链路可用</td>
+                <td>CTest + 真实 server/client</td>
+                <td>每次提交前跑</td>
+              </tr>
+              <tr>
+                <td>Sanitizer</td>
+                <td>抓内存越界、未定义行为、线程竞争</td>
+                <td>ASan / UBSan / TSan</td>
+                <td>每日或每次大改后跑</td>
+              </tr>
+              <tr>
+                <td>Valgrind</td>
+                <td>补看泄漏和错误访问</td>
+                <td>Memcheck / Helgrind / DRD</td>
+                <td>里程碑前跑</td>
+              </tr>
+              <tr>
+                <td>Soak / Stress</td>
+                <td>长时间运行是否稳定</td>
+                <td>循环执行、监控 RSS/线程数/错误率</td>
+                <td>夜间任务</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>9.1 建议先加可压测参数</h3>
+          <ul>
+            <li><code>--rounds</code></li>
+            <li><code>--interval-ms</code></li>
+            <li><code>--startup-wait-ms</code></li>
+            <li><code>--node1-port</code>、<code>--node2-port</code></li>
+            <li>可选：<code>--forever</code> 或 <code>--duration-sec</code></li>
+          </ul>
+
+          <h3>9.2 ASan / UBSan 建议命令</h3>
+          <pre><code>cmake -S /workspace -B /workspace/build-asan -G Ninja \
+  -DBUILD_TESTING=ON \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+  -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+
+cmake --build /workspace/build-asan -j"$(nproc)"
+ctest --test-dir /workspace/build-asan --output-on-failure</code></pre>
+
+          <h3>9.3 TSan 建议单独建目录</h3>
+          <pre><code>cmake -S /workspace -B /workspace/build-tsan -G Ninja \
+  -DBUILD_TESTING=ON \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_C_FLAGS="-fsanitize=thread -fno-omit-frame-pointer" \
+  -DCMAKE_CXX_FLAGS="-fsanitize=thread -fno-omit-frame-pointer"
+
+cmake --build /workspace/build-tsan -j"$(nproc)"
+ctest --test-dir /workspace/build-tsan --output-on-failure</code></pre>
+
+          <div class="warnbox">
+            <strong>注意：</strong> ASan/UBSan 和 TSan 不要混在一个构建目录里。线程 sanitizer 要单独跑，否则结果会很乱。
+          </div>
+
+          <h3>9.4 Valgrind 建议命令</h3>
+          <pre><code>cmake -S /workspace -B /workspace/build-valgrind -G Ninja \
+  -DBUILD_TESTING=ON \
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo
+
+cmake --build /workspace/build-valgrind -j"$(nproc)"
+
+valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+  /workspace/build-valgrind/pingpong_demo</code></pre>
+
+          <h3>9.5 Soak test 最少盯这几个指标</h3>
+          <ul>
+            <li>进程是否异常退出。</li>
+            <li>错误日志是否逐渐增多。</li>
+            <li>RSS 内存是否持续增长。</li>
+            <li>线程数是否异常增加。</li>
+            <li>端口是否释放干净，反复重启会不会失败。</li>
+          </ul>
+
+          <h3>9.6 建议的稳定性场景</h3>
+          <div class="flow">场景 A: 1 轮、0ms 间隔，确认功能最小闭环
+场景 B: 1000 轮、0ms 间隔，放大并发切换问题
+场景 C: 反复启动/停止 100 次，找 shutdown/资源释放问题
+场景 D: client 指向错误端口，验证失败路径
+场景 E: 运行中途主动关闭一侧 server，观察恢复或退出行为
+场景 F: 夜间长跑 30 分钟 / 2 小时，盯内存和线程数</div>
+        </section>
+
+        <section id="pitfalls" class="card" style="margin-top: 16px;">
+          <h2>10. 常见坑</h2>
+
+          <h3>10.1 “gmock 不能 mock 我的类”</h3>
+          <p>通常不是 gmock 不行，而是你的类没有虚接口，或者依赖是自由函数/静态函数/构造行为。处理方式是先加一层接口或 adapter。</p>
+
+          <h3>10.2 “测试非常慢”</h3>
+          <p>根因大概率是你在测试里真的睡了 5 秒。把 sleep 抽出来，单元测试统一改成 <code>0ms</code>。</p>
+
+          <h3>10.3 “测试不稳定，有时过有时不过”</h3>
+          <p>多半是线程时序没控住。写 gmock 时，先设 <code>EXPECT_CALL</code>，再启动线程。不要倒过来。</p>
+
+          <h3>10.4 “集成测试端口冲突”</h3>
+          <p>不要复用 <code>50051/50052</code>。测试必须支持自定义端口，最好是动态端口。</p>
+
+          <h3>10.5 “Send 失败后要不要继续”</h3>
+          <p>这不是测试问题，是产品语义问题。你要先定规则，再写测试。最少要回答：</p>
+          <ul>
+            <li>失败后直接退出，还是继续下一轮？</li>
+            <li>要不要重试？重试几次？间隔多久？</li>
+            <li>是否需要把失败计入统计并输出最终摘要？</li>
+          </ul>
+
+          <h3>10.6 “只跑单元测试，一切都绿，但线上还是抖”</h3>
+          <p>这是正常现象。mock 保证不了真正的线程竞争、gRPC 行为、内存泄漏和长时间运行问题，所以一定要补 sanitizer、Valgrind 和 soak test。</p>
+        </section>
+
+        <section id="plan" class="card" style="margin-top: 16px;">
+          <h2>11. 推荐推进顺序</h2>
+          <ol>
+            <li>先补容器依赖，重建 Dev Container。</li>
+            <li>把发送端依赖抽成 <code>IMessageClient</code>。</li>
+            <li>把睡眠行为抽成 <code>ISleeper</code>。</li>
+            <li>接入 <code>BUILD_TESTING</code>、<code>CTest</code>、<code>GTest::gmock</code>。</li>
+            <li>先写 <code>TurnCoordinator</code>、<code>Node1Sender</code>、<code>Node2Sender</code> 的单元测试。</li>
+            <li>再给 <code>PingPongApp</code> 加配置对象，解除端口/轮数硬编码。</li>
+            <li>补一组真实 gRPC 集成测试。</li>
+            <li>最后再做 ASan/TSan/Valgrind/长跑脚本。</li>
+          </ol>
+
+          <div class="tip">
+            最务实的目标不是“今天把所有测试都补完”，而是先把仓库变成一个 <strong>能持续扩测试</strong> 的结构。第一步一定是把可 mock 的边界做出来。
+          </div>
+        </section>
+
+        <section id="refs" class="card" style="margin-top: 16px; margin-bottom: 20px;">
+          <h2>12. 版本来源</h2>
+          <p>下面这些版本信息基于 2026-03-08 可访问的官方页面：</p>
+          <ul>
+            <li>Debian package pages：<code>cmake</code>、<code>g++-14</code>、<code>libgtest-dev</code>、<code>libgrpc++-dev</code>、<code>protobuf-compiler</code>、<code>protobuf-compiler-grpc</code>、<code>valgrind</code>、<code>gcovr</code>、<code>lcov</code>、<code>clang-tidy</code>。</li>
+            <li>GoogleTest 官方文档：<code>gMock for Dummies</code>、<code>gMock Cookbook</code>、<code>Mocking Reference</code>。</li>
+          </ul>
+
+          <p class="footer">
+            说明：<code>libgmock-dev</code> 在 Debian 13 中与 <code>googletest 1.16.0-1</code> 同源；这点是根据 Debian 的 <code>googletest</code> 系列包信息推断出来的。实际安装时请再用 <code>apt-cache policy libgmock-dev</code> 做一次容器内确认。
+          </p>
+        </section>
+
+        <section id="soak-guide" class="card" style="margin-top: 16px; margin-bottom: 20px;">
+          <h2>13. 容器内 Soak Test 运行与资源观测</h2>
+          <p>这一章专门回答两个现实问题：<code>这里到底怎么跑</code>，以及 <code>ASan/TSan 要不要打进日常长跑</code>。结论先说在前面：<strong>不要把 ASan/TSan 当成常规 soak 二进制</strong>。它们适合做“找 bug 的短跑或中跑”，不适合做“看真实 CPU/RSS 基线的长跑”。</p>
+
+          <h3>13.1 先明确一件事：当前程序还不是真正的 soak 目标</h3>
+          <p>你现在的 <code>pingpong_demo</code> 写死了 <code>10</code> 轮，并且 <code>node1/node2</code> 每轮都各自睡 <code>5s</code>。也就是说单次运行大约会持续 <code>100s</code> 左右，然后自然退出。所以：</p>
+          <ul>
+            <li>如果你现在不改代码，只能做“重复运行型稳定性测试”。</li>
+            <li>如果你要做夜间长跑，最好先把程序改成支持 <code>--rounds</code>、<code>--interval-ms</code>、<code>--forever</code> 这类参数。</li>
+          </ul>
+
+          <h3>13.2 日常 soak 要不要把 ASan/TSan 打包进去</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>构建类型</th>
+                <th>是否建议用于长跑</th>
+                <th>建议用途</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>Release</code> / <code>RelWithDebInfo</code></td>
+                <td class="ok">建议</td>
+                <td>看真实 CPU、RSS、线程数、端口释放、长时间运行稳定性</td>
+              </tr>
+              <tr>
+                <td><code>ASan + UBSan</code></td>
+                <td class="warn">不建议做资源基线长跑</td>
+                <td>适合跑 5 分钟、10 分钟、几百轮这类“抓内存/未定义行为”验证</td>
+              </tr>
+              <tr>
+                <td><code>TSan</code></td>
+                <td class="bad">不建议做夜间资源长跑</td>
+                <td>适合专门抓数据竞争；开销大，结果会明显扭曲 CPU/内存表现</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="warnbox">
+            <strong>结论：</strong><br />
+            你应该至少保留 3 套构建目录：<code>build-soak</code>、<code>build-asan</code>、<code>build-tsan</code>。<code>build-soak</code> 看资源曲线；<code>build-asan</code> 和 <code>build-tsan</code> 负责找问题，不负责给出真实资源基线。
+          </div>
+
+          <h3>13.3 容器里先补观测工具</h3>
+          <p>下面这些命令都针对 Debian 容器内执行：</p>
+          <pre><code>apt-get update &amp;&amp; apt-get install -y --no-install-recommends \
+  procps \
+  psmisc \
+  iproute2 \
+  lsof \
+  sysstat \
+  &amp;&amp; rm -rf /var/lib/apt/lists/*</code></pre>
+
+          <table>
+            <thead>
+              <tr>
+                <th>工具</th>
+                <th>用途</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>ps</code> / <code>top</code></td>
+                <td>看进程 CPU、内存、线程数</td>
+              </tr>
+              <tr>
+                <td><code>pidstat</code></td>
+                <td>持续记录某个 PID 的 CPU、RSS、页错误、I/O</td>
+              </tr>
+              <tr>
+                <td><code>ss</code></td>
+                <td>看端口监听和连接是否释放</td>
+              </tr>
+              <tr>
+                <td><code>lsof</code></td>
+                <td>补查端口或文件句柄占用</td>
+              </tr>
+              <tr>
+                <td><code>pstree</code></td>
+                <td>看进程树</td>
+              </tr>
+              <tr>
+                <td><code>/proc/&lt;pid&gt;/status</code></td>
+                <td>看 <code>VmRSS</code>、<code>VmSize</code>、<code>Threads</code></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>13.4 先准备日志目录和 3 套构建</h3>
+          <pre><code>mkdir -p /workspace/soak/logs /workspace/soak/metrics
+
+cmake -S /workspace -B /workspace/build-soak -G Ninja \
+  -DBUILD_TESTING=ON \
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake --build /workspace/build-soak -j"$(nproc)"
+
+cmake -S /workspace -B /workspace/build-asan -G Ninja \
+  -DBUILD_TESTING=ON \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+  -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+cmake --build /workspace/build-asan -j"$(nproc)"
+
+cmake -S /workspace -B /workspace/build-tsan -G Ninja \
+  -DBUILD_TESTING=ON \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_C_FLAGS="-fsanitize=thread -fno-omit-frame-pointer" \
+  -DCMAKE_CXX_FLAGS="-fsanitize=thread -fno-omit-frame-pointer"
+cmake --build /workspace/build-tsan -j"$(nproc)"</code></pre>
+
+          <h3>13.5 如果你现在先不改代码：用“重复运行型” soak</h3>
+          <p>这条路径适合当前仓库原样验证。因为程序单次运行就会退出，所以你只能连续跑很多次，盯有没有崩、有没有端口没释放、有没有逐次变慢。</p>
+
+          <pre><code>for i in $(seq 1 100); do
+  ts=$(date '+%F %T')
+  echo "=== run ${i} ${ts} ===" | tee -a /workspace/soak/logs/repeat.log
+
+  /workspace/build-soak/pingpong_demo \
+    &gt;&gt; /workspace/soak/logs/app-repeat.log 2&gt;&amp;1 &amp;
+  APP_PID=$!
+  echo "${APP_PID}" &gt;&gt; /workspace/soak/logs/pids.log
+
+  pidstat -r -u -d -h -p "${APP_PID}" 5 \
+    &gt;&gt; /workspace/soak/metrics/pidstat-repeat.log 2&gt;&amp;1 &amp;
+  PIDSTAT_PID=$!
+
+  while kill -0 "${APP_PID}" 2&gt;/dev/null; do
+    ts=$(date '+%F %T')
+    echo "[${ts}]" &gt;&gt; /workspace/soak/metrics/ps-repeat.log
+    ps -o pid,ppid,%cpu,%mem,rss,vsz,nlwp,etime,stat,cmd -p "${APP_PID}" \
+      &gt;&gt; /workspace/soak/metrics/ps-repeat.log
+    awk '/VmRSS|VmSize|Threads/ {print}' /proc/"${APP_PID}"/status \
+      &gt;&gt; /workspace/soak/metrics/status-repeat.log
+    ss -lntp | grep -E '50051|50052' \
+      &gt;&gt; /workspace/soak/metrics/ports-repeat.log || true
+    sleep 5
+  done
+
+  wait "${APP_PID}"
+  RC=$?
+  kill "${PIDSTAT_PID}" 2&gt;/dev/null || true
+
+  echo "run=${i} rc=${RC}" &gt;&gt; /workspace/soak/logs/repeat-exit.log
+  ss -lntp | grep -E '50051|50052' \
+    &gt;&gt; /workspace/soak/metrics/ports-after-exit.log || true
+
+  if [ "${RC}" -ne 0 ]; then
+    echo "repeat soak stopped at run ${i}" | tee -a /workspace/soak/logs/repeat.log
+    break
+  fi
+done</code></pre>
+
+          <div class="note">
+            这条命令链最适合对应 9.6 的场景 A、B、C、D。你可以把 <code>seq 1 100</code> 改成更大的次数，观察第几十次以后是否开始报错、端口冲突、退出码异常。
+          </div>
+
+          <h3>13.6 推荐的长跑方式：先把程序改成支持参数</h3>
+          <p>真正像样的 soak，不应该靠 shell 循环不断重启，而应该让同一个进程长时间跑。推荐至少支持这些参数：</p>
+          <ul>
+            <li><code>--rounds 1000000</code></li>
+            <li><code>--interval-ms 0</code></li>
+            <li><code>--startup-wait-ms 50</code></li>
+            <li><code>--node1-port 50051</code>、<code>--node2-port 50052</code></li>
+            <li>可选：<code>--forever</code> 或 <code>--duration-sec 7200</code></li>
+          </ul>
+
+          <p>参数化以后，长跑命令可以像这样：</p>
+          <pre><code>/workspace/build-soak/pingpong_demo \
+  --rounds 1000000 \
+  --interval-ms 0 \
+  --startup-wait-ms 50 \
+  --node1-port 50051 \
+  --node2-port 50052 \
+  &gt; /workspace/soak/logs/app-soak.log 2&gt;&amp;1 &amp;
+
+APP_PID=$!
+echo "${APP_PID}" &gt; /workspace/soak/logs/soak.pid</code></pre>
+
+          <h3>13.7 同时采集 CPU、RSS、线程数、端口</h3>
+          <pre><code>pidstat -r -u -d -h -p "${APP_PID}" 5 \
+  &gt; /workspace/soak/metrics/pidstat-soak.log 2&gt;&amp;1 &amp;
+PIDSTAT_PID=$!
+
+while kill -0 "${APP_PID}" 2&gt;/dev/null; do
+  ts=$(date '+%F %T')
+
+  echo "[${ts}]" &gt;&gt; /workspace/soak/metrics/ps-soak.log
+  ps -o pid,ppid,%cpu,%mem,rss,vsz,nlwp,etime,stat,cmd -p "${APP_PID}" \
+    &gt;&gt; /workspace/soak/metrics/ps-soak.log
+
+  echo "[${ts}]" &gt;&gt; /workspace/soak/metrics/status-soak.log
+  awk '/VmRSS|VmSize|Threads/ {print}' /proc/"${APP_PID}"/status \
+    &gt;&gt; /workspace/soak/metrics/status-soak.log
+
+  echo "[${ts}]" &gt;&gt; /workspace/soak/metrics/ports-soak.log
+  ss -lntp | grep -E '50051|50052' \
+    &gt;&gt; /workspace/soak/metrics/ports-soak.log || true
+
+  if [ -f /sys/fs/cgroup/memory.current ]; then
+    echo "${ts} $(cat /sys/fs/cgroup/memory.current)" \
+      &gt;&gt; /workspace/soak/metrics/cgroup-memory.log
+  fi
+
+  if [ -f /sys/fs/cgroup/cpu.stat ]; then
+    echo "[${ts}]" &gt;&gt; /workspace/soak/metrics/cgroup-cpu.log
+    cat /sys/fs/cgroup/cpu.stat \
+      &gt;&gt; /workspace/soak/metrics/cgroup-cpu.log
+  fi
+
+  sleep 5
+done
+
+wait "${APP_PID}"
+RC=$?
+kill "${PIDSTAT_PID}" 2&gt;/dev/null || true
+echo "rc=${RC}" &gt; /workspace/soak/logs/soak-exit.code</code></pre>
+
+          <h3>13.8 跑完以后看什么</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>文件</th>
+                <th>看点</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>app-soak.log</code> / <code>app-repeat.log</code></td>
+                <td>有没有 <code>Segmentation fault</code>、<code>terminate called</code>、gRPC failed、超时、异常退出</td>
+              </tr>
+              <tr>
+                <td><code>pidstat-*.log</code></td>
+                <td>CPU 是否持续飙高、RSS 是否持续上升、是否出现异常页错误/I/O</td>
+              </tr>
+              <tr>
+                <td><code>status-*.log</code></td>
+                <td><code>Threads</code> 是否单调增长，<code>VmRSS</code> 是否只涨不回</td>
+              </tr>
+              <tr>
+                <td><code>ports-*.log</code></td>
+                <td>进程退出后端口是否仍被占用</td>
+              </tr>
+              <tr>
+                <td><code>*-exit.code</code></td>
+                <td>退出码是否始终为 <code>0</code></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>13.9 我建议你给 soak 设一个最小通过标准</h3>
+          <ul>
+            <li>退出码始终为 <code>0</code>。</li>
+            <li>日志中不出现连续增长的 gRPC failed/异常栈。</li>
+            <li><code>VmRSS</code> 和 <code>RSS</code> 不出现无上限单调增长。</li>
+            <li><code>Threads</code> 长时间保持稳定，不出现一轮一轮上涨。</li>
+            <li>进程退出后 5 秒内，<code>50051/50052</code> 不再被监听。</li>
+          </ul>
+
+          <h3>13.10 ASan/TSan 应该怎么配合这套流程</h3>
+          <ol>
+            <li>先用 <code>build-asan</code> 跑短场景：1 轮、100 轮、1000 轮，找越界、UAF、未定义行为。</li>
+            <li>再用 <code>build-tsan</code> 跑 0ms 间隔的高频场景，专门看 race。</li>
+            <li>最后用 <code>build-soak</code> 跑 30 分钟、2 小时的长跑，观察真实资源曲线。</li>
+          </ol>
+
+          <div class="tip">
+            正确顺序不是“把 sanitizer 打进同一套包里一直跑”，而是“先 sanitizer 找 bug，再 release/relwithdebinfo 做真实长跑”。这两类目标不要混。
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

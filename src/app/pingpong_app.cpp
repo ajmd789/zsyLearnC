@@ -1,7 +1,10 @@
 #include "app/pingpong_app.h"
 
 #include <chrono>
+#include <condition_variable>
 #include <memory>
+#include <mutex>
+#include <sstream>
 #include <string>
 #include <thread>
 
@@ -16,23 +19,46 @@
 namespace app {
 namespace {
 
-constexpr char kNode1ServerAddr[] = "0.0.0.0:50051";
-constexpr char kNode2ServerAddr[] = "0.0.0.0:50052";
-constexpr char kNode1Target[] = "127.0.0.1:50051";
-constexpr char kNode2Target[] = "127.0.0.1:50052";
-constexpr int kRounds = 10;
-const std::chrono::seconds kInterval(5);
+std::string MakeListenAddress(int port) {
+  return "0.0.0.0:" + std::to_string(port);
+}
+
+std::string MakeTargetAddress(int port) {
+  return "127.0.0.1:" + std::to_string(port);
+}
+
+std::string BuildStartSummary(const PingPongAppConfig& config) {
+  std::ostringstream oss;
+  oss << "starting ping-pong app"
+      << " rounds=" << config.rounds
+      << " interval_ms=" << config.interval.count()
+      << " startup_wait_ms=" << config.startup_wait.count()
+      << " node1_port=" << config.node1_port
+      << " node2_port=" << config.node2_port;
+  if (config.duration.has_value()) {
+    oss << " duration_sec=" << config.duration->count();
+  }
+  return oss.str();
+}
 
 }  // namespace
 
+PingPongApp::PingPongApp(PingPongAppConfig config) : config_(config) {}
+
 int PingPongApp::Run() {
   common::ThreadSafeLogger logger;
+  logger.Log(BuildStartSummary(config_));
 
   common::MessengerService node1_service("node1", logger);
   common::MessengerService node2_service("node2", logger);
 
-  auto node1_server = common::BuildServer(kNode1ServerAddr, &node1_service);
-  auto node2_server = common::BuildServer(kNode2ServerAddr, &node2_service);
+  const std::string node1_server_addr = MakeListenAddress(config_.node1_port);
+  const std::string node2_server_addr = MakeListenAddress(config_.node2_port);
+  const std::string node1_target = MakeTargetAddress(config_.node1_port);
+  const std::string node2_target = MakeTargetAddress(config_.node2_port);
+
+  auto node1_server = common::BuildServer(node1_server_addr, &node1_service);
+  auto node2_server = common::BuildServer(node2_server_addr, &node2_service);
 
   if (!node1_server || !node2_server) {
     logger.Log("failed to start gRPC servers");
@@ -42,20 +68,50 @@ int PingPongApp::Run() {
   std::thread node1_server_thread([&]() { node1_server->Wait(); });
   std::thread node2_server_thread([&]() { node2_server->Wait(); });
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  std::this_thread::sleep_for(config_.startup_wait);
 
-  common::GrpcMessageClient node1_client(kNode2Target, logger);
-  common::GrpcMessageClient node2_client(kNode1Target, logger);
+  common::GrpcMessageClient node1_client(node2_target, logger);
+  common::GrpcMessageClient node2_client(node1_target, logger);
 
   common::TurnCoordinator coordinator(common::Turn::Node1ToNode2);
-  node1::Node1Sender sender1(node1_client, coordinator, kRounds, kInterval);
-  node2::Node2Sender sender2(node2_client, coordinator, kRounds, kInterval);
+  node1::Node1Sender sender1(node1_client, coordinator, config_.rounds,
+                             config_.interval);
+  node2::Node2Sender sender2(node2_client, coordinator, config_.rounds,
+                             config_.interval);
+
+  std::mutex duration_mutex;
+  std::condition_variable duration_cv;
+  bool stop_duration_thread = false;
+
+  std::thread duration_thread;
+  if (config_.duration.has_value()) {
+    duration_thread = std::thread([&]() {
+      std::unique_lock<std::mutex> lock(duration_mutex);
+      const bool stopped_early = duration_cv.wait_for(
+          lock, *config_.duration, [&]() { return stop_duration_thread; });
+      if (stopped_early) {
+        return;
+      }
+
+      lock.unlock();
+      logger.Log("duration limit reached, stopping ping-pong app");
+      coordinator.SetTurn(common::Turn::Done);
+      node1_server->Shutdown();
+      node2_server->Shutdown();
+    });
+  }
 
   std::thread sender1_thread([&]() { sender1.Run(); });
   std::thread sender2_thread([&]() { sender2.Run(); });
 
   sender1_thread.join();
   sender2_thread.join();
+
+  {
+    std::lock_guard<std::mutex> lock(duration_mutex);
+    stop_duration_thread = true;
+  }
+  duration_cv.notify_all();
 
   node1_server->Shutdown();
   node2_server->Shutdown();
@@ -64,7 +120,11 @@ int PingPongApp::Run() {
   node1_server_thread.join();
   node2_server_thread.join();
 
-  logger.Log("completed 10 ping-pong rounds");
+  if (duration_thread.joinable()) {
+    duration_thread.join();
+  }
+
+  logger.Log("ping-pong application stopped cleanly");
   return 0;
 }
 

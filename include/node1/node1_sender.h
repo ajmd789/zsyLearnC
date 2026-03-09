@@ -13,7 +13,7 @@ class Node1Sender {
   Node1Sender(common::GrpcMessageClient& client,
               common::TurnCoordinator& coordinator,
               int rounds,
-              std::chrono::seconds interval);
+              std::chrono::milliseconds interval);
 
   void Run();
 
@@ -21,7 +21,7 @@ class Node1Sender {
   common::GrpcMessageClient& client_;
   common::TurnCoordinator& coordinator_;
   int rounds_;
-  std::chrono::seconds interval_;
+  std::chrono::milliseconds interval_;
 };
 
 }  // namespace node1

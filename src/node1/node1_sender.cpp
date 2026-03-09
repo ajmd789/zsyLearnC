@@ -6,7 +6,7 @@ namespace node1 {
 
 Node1Sender::Node1Sender(common::GrpcMessageClient& client,
                          common::TurnCoordinator& coordinator, int rounds,
-                         std::chrono::seconds interval)
+                         std::chrono::milliseconds interval)
     : client_(client),
       coordinator_(coordinator),
       rounds_(rounds),
