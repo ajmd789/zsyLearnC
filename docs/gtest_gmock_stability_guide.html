@@ -1146,6 +1146,11 @@ echo "rc=${RC}" &gt; /workspace/soak/logs/soak-exit.code</code></pre>
           <div class="tip">
             正确顺序不是“把 sanitizer 打进同一套包里一直跑”，而是“先 sanitizer 找 bug，再 release/relwithdebinfo 做真实长跑”。这两类目标不要混。
           </div>
+
+          <div class="note">
+            已落地到仓库的入口参数：<code>--rounds</code>、<code>--interval-ms</code>、<code>--startup-wait-ms</code>、<code>--duration-sec</code>、<code>--node1-port</code>、<code>--node2-port</code>。<br />
+            容器内一键夜跑脚本：<code>bash scripts/run_overnight_soak.sh --duration-sec 28800</code>
+          </div>
         </section>
       </main>
     </div>

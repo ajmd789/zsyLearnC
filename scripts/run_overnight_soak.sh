@@ -152,6 +152,9 @@ MONITOR_PID=""
 
 cleanup() {
   set +e
+  if kill -0 "${APP_PID}" 2>/dev/null; then
+    kill "${APP_PID}" 2>/dev/null || true
+  fi
   if [[ -n "${PIDSTAT_PID}" ]]; then
     kill "${PIDSTAT_PID}" 2>/dev/null || true
   fi
@@ -196,8 +199,10 @@ fi
 )&
 MONITOR_PID=$!
 
+set +e
 wait "${APP_PID}"
 RC=$?
+set -e
 
 cleanup
 trap - EXIT
